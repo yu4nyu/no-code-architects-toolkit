@@ -114,7 +114,7 @@ RUN git clone https://github.com/libass/libass.git && \
     cd .. && rm -rf libass
 
 # Build and install FFmpeg with all required features
-RUN git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg && \
+RUN git clone git://git.ffmpeg.org/ffmpeg.git ffmpeg && \
     cd ffmpeg && \
     git checkout n7.0.2 && \
     PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig" \
