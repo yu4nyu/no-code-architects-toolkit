@@ -147,6 +147,7 @@ def get_available_fonts():
             font_names.add(font_name)
         except Exception:
             continue
+    font_names.add('Source Han Sans SC VF') # matplotlib.font_manager 会漏掉这个字体，我已经在fonts目录放了字体tts文件，这里手动添加进列表
     logger.info(f"Available fonts retrieved: {font_names}")
     return list(font_names)
 
