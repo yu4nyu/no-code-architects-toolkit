@@ -25,6 +25,9 @@ The request body must be a JSON object with the following properties:
   - URL to an SRT subtitle file
   - URL to an ASS subtitle file
   - If not provided, the system will automatically generate captions by transcribing the audio from the video
+  
+  Note:
+  - When `captions` is raw text (not SRT/ASS), only `classic` style is supported. The text overlays for the full video duration (unless you specify `exclude_time_ranges`). Advanced styles such as `karaoke`, `highlight`, `underline`, and `word_by_word` require time-coded captions (SRT) or an automatic transcription.
 - `settings` (object, optional): An object containing various styling options for the captions. See the schema below for available options.
 - `replace` (array, optional): An array of objects with `find` and `replace` properties, specifying text replacements to be made in the captions.
 - `webhook_url` (string, optional): A URL to receive a webhook notification when the captioning process is complete.

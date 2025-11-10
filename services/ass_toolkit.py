@@ -94,6 +94,43 @@ def get_video_resolution(video_path):
         logger.error(f"Error getting video resolution: {str(e)}. Using default resolution 384x288.")
         return 384, 288
 
+def get_video_duration(video_path):
+    """Get the duration of the video in seconds."""
+    try:
+        probe = ffmpeg.probe(video_path)
+        fmt = probe.get('format', {})
+        dur_str = fmt.get('duration')
+        if dur_str:
+            return float(dur_str)
+        max_duration = 0.0
+        for stream in probe.get('streams', []):
+            dur_str = stream.get('duration')
+            if dur_str:
+                try:
+                    d = float(dur_str)
+                    if d > max_duration:
+                        max_duration = d
+                except Exception:
+                    pass
+            afr = stream.get('avg_frame_rate', '0/0')
+            nb_frames = stream.get('nb_frames')
+            if nb_frames and afr and afr != '0/0':
+                try:
+                    num, den = map(int, afr.split('/'))
+                    if den != 0:
+                        d = int(nb_frames) / (num / den)
+                        if d > max_duration:
+                            max_duration = d
+                except Exception:
+                    pass
+        if max_duration > 0:
+            return max_duration
+        logger.warning("Video duration not found; defaulting to 10.0 seconds.")
+        return 10.0
+    except Exception as e:
+        logger.error(f"Error getting video duration: {str(e)}. Defaulting to 10.0 seconds.")
+        return 10.0
+
 def get_available_fonts():
     """Get the list of available fonts on the system."""
     try:
@@ -826,17 +863,37 @@ def generate_ass_captions_v1(video_url, captions, settings, replace, exclude_tim
                 subtitle_type = 'ass'
                 logger.info(f"Job {job_id}: Detected ASS formatted captions.")
             else:
-                # Treat as SRT
-                logger.info(f"Job {job_id}: Detected SRT formatted captions.")
-                # Validate style for SRT
-                if style_type != 'classic':
-                    error_message = "Only 'classic' style is supported for SRT captions."
-                    logger.error(f"Job {job_id}: {error_message}")
-                    return {"error": error_message}
-                transcription_result = srt_to_transcription_result(captions_content)
-                # Generate ASS based on chosen style
-                subtitle_content = process_subtitle_events(transcription_result, style_type, style_options, replace_dict, video_resolution)
-                subtitle_type = 'ass'
+                # Try SRT parsing first; if it fails, treat as raw text
+                try:
+                    _ = list(srt.parse(captions_content))
+                    logger.info(f"Job {job_id}: Detected SRT formatted captions.")
+                    # Validate style for SRT
+                    if style_type != 'classic':
+                        error_message = "Only 'classic' style is supported for SRT captions."
+                        logger.error(f"Job {job_id}: {error_message}")
+                        return {"error": error_message}
+                    transcription_result = srt_to_transcription_result(captions_content)
+                    # Generate ASS based on chosen style
+                    subtitle_content = process_subtitle_events(transcription_result, style_type, style_options, replace_dict, video_resolution)
+                    subtitle_type = 'ass'
+                except Exception:
+                    # Treat as raw caption text spanning the full video duration
+                    logger.info(f"Job {job_id}: Treating captions as raw text.")
+                    if style_type != 'classic':
+                        error_message = "Raw caption text supports only 'classic' style."
+                        logger.error(f"Job {job_id}: {error_message}")
+                        return {"error": error_message}
+                    video_duration = get_video_duration(video_path)
+                    transcription_result = {
+                        'segments': [{
+                            'start': 0.0,
+                            'end': float(video_duration),
+                            'text': captions_content,
+                            'words': []
+                        }]
+                    }
+                    subtitle_content = process_subtitle_events(transcription_result, 'classic', style_options, replace_dict, video_resolution)
+                    subtitle_type = 'ass'
         else:
             # No captions provided, generate transcription
             logger.info(f"Job {job_id}: No captions provided, generating transcription.")
